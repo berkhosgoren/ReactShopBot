@@ -1,2 +1,7 @@
 node_modules/
 cookies/
+logs/
+*.exe
+*.log
+tesla-cookies.json
+"dist/" 

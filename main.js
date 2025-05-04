@@ -1,5 +1,5 @@
 /* 
-* ⚠️ DISCLAIMER:
+ * ⚠️ DISCLAIMER:
  * - This tool is for educational and personal portfolio use only.
  * - It is NOT affiliated with Tesla or endorsed in any way.
  * - It does NOT perform automated logins or bypass any access controls.
@@ -8,22 +8,47 @@
  * 📦 Created for ReactShopBot — a demonstration project.
  */
 
-
+const notifier = require('node-notifier');
 const { chromium } = require('playwright');
 const fs = require('fs');
 const path = require('path');
 
+// === Configuration ===
 const TARGET_PRODUCT_URL = 'https://www.tesla.com/tr_TR/modely';
 const cookiesPath = path.resolve(__dirname, 'cookies/storage.json');
-const CHECK_INTERVAL = 20000;
+const CHECK_INTERVAL = 15000;
 
+// === Error Log Setup ===
+function getDatedLogPath() {
+  const now = new Date();
+  const yyyy = now.getFullYear();
+  const mm = String(now.getMonth() + 1).padStart(2, '0');
+  const dd = String(now.getDate()).padStart(2, '0');
+  return path.resolve(__dirname, `logs/error-${yyyy}-${mm}-${dd}.log`);
+}
+
+function logError(message) {
+  const timestamp = new Date().toISOString();
+  const fullMessage = `[${timestamp}] ${message}\n`;
+  const logPath = getDatedLogPath();
+
+  if (!fs.existsSync(path.dirname(logPath))) {
+    fs.mkdirSync(path.dirname(logPath));
+  }
+
+  fs.appendFileSync(logPath, fullMessage);
+}
+
+// === Startup Check ===
 console.log(`🔍 Checking login file: ${cookiesPath}`);
-
 if (!fs.existsSync(cookiesPath)) {
-  console.error('❌ No login session found. Please run scripts/login.js before starting this bot.');
+  const errMsg = '❌ No login session found. Please export cookies into tesla-cookies.json and rerun.';
+  console.error(errMsg);
+  logError(errMsg);
   process.exit(1);
 }
 
+// === Main Bot Logic ===
 (async () => {
   const browser = await chromium.launch({ headless: false });
   const context = await browser.newContext({
@@ -32,11 +57,11 @@ if (!fs.existsSync(cookiesPath)) {
 
   const page = await context.newPage();
 
-  const checkAvailability = async (page) => {
+  const checkAvailability = async () => {
     try {
       console.log(`🔄 Checking at ${new Date().toLocaleTimeString()}...`);
       await page.goto(TARGET_PRODUCT_URL, { waitUntil: 'domcontentloaded' });
-      await page.waitForTimeout(3000);
+      await page.waitForTimeout(5000);
 
       const waitlistBtn = await page.$('text="Güncellemeleri Al"');
       if (waitlistBtn) {
@@ -56,6 +81,13 @@ if (!fs.existsSync(cookiesPath)) {
           await btn.click();
           await page.waitForLoadState('networkidle');
           process.stdout.write('\x07');
+
+          notifier.notify({
+            title: '🚗 Tesla Bot',
+            message: 'Satın Al butonu bulundu ve tıklandı!',
+            sound: true
+          });
+
           console.log('🔔 BUY button clicked. Stopping loop.');
           clearInterval(loop);
           return;
@@ -64,10 +96,12 @@ if (!fs.existsSync(cookiesPath)) {
 
       console.log('❌ No valid buy buttons found.');
     } catch (err) {
-      console.error('⚠️ Error during check:', err.message);
+      const errorMessage = `⚠️ Error during check: ${err.message}`;
+      console.error(errorMessage);
+      logError(errorMessage);
     }
   };
 
-  await checkAvailability(page);
-  const loop = setInterval(() => checkAvailability(page), CHECK_INTERVAL);
+  await checkAvailability();
+  const loop = setInterval(() => checkAvailability(), CHECK_INTERVAL);
 })();

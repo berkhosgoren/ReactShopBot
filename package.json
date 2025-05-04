@@ -1,15 +1,28 @@
 {
-  "name": "tesla-autobuy",
+  "name": "reactshopbot",
   "version": "1.0.0",
-  "main": "index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "description": "",
-  "devDependencies": {
+  "description": "Tesla Autobuy Monitor Bot",
+  "type": "commonjs",
+  "main": "start.js",
+  "bin": "start.js",
+  "scripts": {},
+  "dependencies": {
+    "node-notifier": "^10.0.1",
     "playwright": "^1.52.0"
+  },
+  "pkg": {
+    "scripts": [
+      "start.js",
+      "main.js",
+      "scripts/inject-cookies.js"
+    ],
+    "assets": [
+      "cookies/*",
+      "node_modules/node-notifier/**/*",
+      "node_modules/playwright-core/**/*"
+    ],
+    "targets": [
+      "node18-win-x64"
+    ]
   }
 }
