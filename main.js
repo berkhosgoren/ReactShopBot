@@ -1,8 +1,11 @@
-/**
- * ⚠️ DISCLAIMER:
- * This script is for educational and portfolio purposes only.
- * It is not affiliated with or endorsed by Tesla Inc.
- * Replace the TARGET_PRODUCT_URL with any dynamic product page that becomes available over time.
+/* 
+* ⚠️ DISCLAIMER:
+ * - This tool is for educational and personal portfolio use only.
+ * - It is NOT affiliated with Tesla or endorsed in any way.
+ * - It does NOT perform automated logins or bypass any access controls.
+ * - All logic is based on publicly accessible website content and manual user login.
+ *
+ * 📦 Created for ReactShopBot — a demonstration project.
  */
 
 
@@ -10,16 +13,18 @@ const { chromium } = require('playwright');
 const fs = require('fs');
 const path = require('path');
 
-const TESLA_MODEL_URL = 'https://www.tesla.com/tr_TR/modely'; // Example product page
+const TARGET_PRODUCT_URL = 'https://www.tesla.com/tr_TR/modely';
 const cookiesPath = path.resolve(__dirname, 'cookies/storage.json');
-const CHECK_INTERVAL = 20000; // 20 seconds
+const CHECK_INTERVAL = 20000;
+
+console.log(`🔍 Checking login file: ${cookiesPath}`);
+
+if (!fs.existsSync(cookiesPath)) {
+  console.error('❌ No login session found. Please run scripts/login.js before starting this bot.');
+  process.exit(1);
+}
 
 (async () => {
-  if (!fs.existsSync(cookiesPath)) {
-    console.error('❌ No saved login found. Please run scripts/login.js first.');
-    process.exit(1);
-  }
-
   const browser = await chromium.launch({ headless: false });
   const context = await browser.newContext({
     storageState: cookiesPath,
@@ -27,11 +32,11 @@ const CHECK_INTERVAL = 20000; // 20 seconds
 
   const page = await context.newPage();
 
-  const checkAvailability = async () => {
+  const checkAvailability = async (page) => {
     try {
       console.log(`🔄 Checking at ${new Date().toLocaleTimeString()}...`);
-      await page.goto(TESLA_MODEL_URL, { waitUntil: 'domcontentloaded' });
-      await page.waitForTimeout(3000); // Let React render content
+      await page.goto(TARGET_PRODUCT_URL, { waitUntil: 'domcontentloaded' });
+      await page.waitForTimeout(3000);
 
       const waitlistBtn = await page.$('text="Güncellemeleri Al"');
       if (waitlistBtn) {
@@ -63,9 +68,6 @@ const CHECK_INTERVAL = 20000; // 20 seconds
     }
   };
 
-  // First run
-  await checkAvailability();
-
-  // Repeat every X seconds
-  const loop = setInterval(checkAvailability, CHECK_INTERVAL);
+  await checkAvailability(page);
+  const loop = setInterval(() => checkAvailability(page), CHECK_INTERVAL);
 })();
