@@ -1,7 +1,17 @@
+# Dependency folders
 node_modules/
 cookies/
 logs/
+
+# Build artifacts
+dist/
 *.exe
 *.log
+
+# Sensitive or temporary data
 tesla-cookies.json
-"dist/" 
+
+# OS and editor junk
+.DS_Store
+Thumbs.db
+*.swp
