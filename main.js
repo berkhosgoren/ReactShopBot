@@ -49,22 +49,19 @@ if (!fs.existsSync(cookiesPath)) {
   process.exit(1);
 }
 
-// === Main Bot Logic ===
 (async () => {
   const browser = await chromium.launch({ headless: false });
   const context = await browser.newContext({
     storageState: cookiesPath,
   });
-
   const page = await context.newPage();
 
-  // --- Session Validity Check ---
-  async function isSessionValid(page) {
+  // === Session Validity Check ===
+  async function isSessionValid() {
     try {
       await page.goto(SESSION_CHECK_URL, { waitUntil: 'domcontentloaded' });
-      const url = page.url();
-      if (url.includes('/login')) {
-        console.error('❌ Session expired. Redirected to login page.');
+      if (page.url().includes('/login')) {
+        console.error('❌ Session expired. Redirected to login.');
         logError('❌ Session expired. Please refresh cookies.');
         return false;
       }
@@ -75,7 +72,7 @@ if (!fs.existsSync(cookiesPath)) {
     }
   }
 
-  if (!(await isSessionValid(page))) {
+  if (!(await isSessionValid())) {
     notifier.notify({
       title: 'Tesla Bot',
       message: 'Session expired! Refresh cookies to resume.',
@@ -85,6 +82,7 @@ if (!fs.existsSync(cookiesPath)) {
     process.exit(1);
   }
 
+  // === Check Function ===
   const checkAvailability = async () => {
     try {
       console.log(`🔄 Checking at ${new Date().toLocaleTimeString()}...`);
@@ -100,19 +98,33 @@ if (!fs.existsSync(cookiesPath)) {
       console.log('🟢 Waitlist button gone — scanning CTA buttons...');
 
       const validBuyWords = ['sipariş', 'satın', 'konfigüre'];
-      const allPrimaryButtons = await page.$$('a.tds-btn--primary, button.tds-btn--primary');
+      const buttons = await page.$$('a.tds-btn--primary, button.tds-btn--primary');
 
-      for (const btn of allPrimaryButtons) {
+      for (const btn of buttons) {
         const text = await btn.textContent();
-        if (text && validBuyWords.some(w => text.toLowerCase().includes(w))) {
-          console.log(`✅ Found BUY CTA: "${text.trim()}". Clicking it...`);
-          await btn.click();
+        if (text && validBuyWords.some(word => text.toLowerCase().includes(word))) {
+          console.log(`✅ Found BUY CTA: "${text.trim()}". Attempting click...`);
+          try {
+            await btn.click({ timeout: 3000 });
+          } catch (firstErr) {
+            console.warn(`⚠️ First click failed: ${firstErr.message}. Retrying...`);
+            try {
+              await btn.click({ timeout: 3000 });
+              console.log('✅ Retry click succeeded.');
+            } catch (retryErr) {
+              console.error(`❌ Retry click failed: ${retryErr.message}`);
+              logError(`Retry click failed: ${retryErr.message}`);
+              return;
+            }
+          }
+
           await page.waitForLoadState('networkidle');
 
-          const currentUrl = page.url();
-          if (currentUrl.includes('/login')) {
-            console.error('🚨 Redirected to login after clicking BUY.');
-            logError('🚨 Redirected to login after BUY click. Session expired mid-process.');
+          const postClickUrl = page.url();
+          if (postClickUrl.includes('/login')) {
+            const msg = '🚨 Redirected to login after clicking BUY.';
+            console.error(msg);
+            logError(msg);
             notifier.notify({
               title: 'Tesla Bot',
               message: 'Session expired during BUY attempt!',
