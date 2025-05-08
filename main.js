@@ -15,6 +15,7 @@ const path = require('path');
 
 // === Configuration ===
 const TARGET_PRODUCT_URL = 'https://www.tesla.com/tr_TR/modely';
+const SESSION_CHECK_URL = 'https://www.tesla.com/teslaaccount';
 const cookiesPath = path.resolve(__dirname, 'cookies/storage.json');
 const CHECK_INTERVAL = 15000;
 
@@ -57,6 +58,33 @@ if (!fs.existsSync(cookiesPath)) {
 
   const page = await context.newPage();
 
+  // --- Session Validity Check ---
+  async function isSessionValid(page) {
+    try {
+      await page.goto(SESSION_CHECK_URL, { waitUntil: 'domcontentloaded' });
+      const url = page.url();
+      if (url.includes('/login')) {
+        console.error('❌ Session expired. Redirected to login page.');
+        logError('❌ Session expired. Please refresh cookies.');
+        return false;
+      }
+      return true;
+    } catch (err) {
+      logError(`⚠️ Session check failed: ${err.message}`);
+      return false;
+    }
+  }
+
+  if (!(await isSessionValid(page))) {
+    notifier.notify({
+      title: 'Tesla Bot',
+      message: 'Session expired! Refresh cookies to resume.',
+      sound: true
+    });
+    await browser.close();
+    process.exit(1);
+  }
+
   const checkAvailability = async () => {
     try {
       console.log(`🔄 Checking at ${new Date().toLocaleTimeString()}...`);
@@ -80,8 +108,22 @@ if (!fs.existsSync(cookiesPath)) {
           console.log(`✅ Found BUY CTA: "${text.trim()}". Clicking it...`);
           await btn.click();
           await page.waitForLoadState('networkidle');
-          process.stdout.write('\x07');
 
+          const currentUrl = page.url();
+          if (currentUrl.includes('/login')) {
+            console.error('🚨 Redirected to login after clicking BUY.');
+            logError('🚨 Redirected to login after BUY click. Session expired mid-process.');
+            notifier.notify({
+              title: 'Tesla Bot',
+              message: 'Session expired during BUY attempt!',
+              sound: true
+            });
+            clearInterval(loop);
+            await browser.close();
+            return;
+          }
+
+          process.stdout.write('\x07');
           notifier.notify({
             title: '🚗 Tesla Bot',
             message: 'Satın Al butonu bulundu ve tıklandı!',
